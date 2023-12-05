@@ -8,7 +8,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.glovobot"
-        minSdk = 23
+        minSdk = 24
         targetSdk = 33
         versionCode = 3
         versionName = "3.0"

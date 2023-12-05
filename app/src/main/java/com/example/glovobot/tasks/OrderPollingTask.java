@@ -1,7 +1,6 @@
 package com.example.glovobot.tasks;
 
 import android.location.Location;
-import android.widget.Toast;
 
 import com.example.glovobot.Model.AuthenticationRequest;
 import com.example.glovobot.Model.AuthenticationResponse;
@@ -12,7 +11,6 @@ import com.example.glovobot.Model.GlovoTaskData;
 import com.example.glovobot.Model.NewMessageRequest;
 import com.example.glovobot.Model.NewMessageRequestParams;
 import com.example.glovobot.Model.NewNotificationRequest;
-import com.example.glovobot.Model.Order;
 import com.example.glovobot.Model.Point;
 import com.example.glovobot.Model.StepResponse;
 import com.example.glovobot.Model.Steps;
@@ -20,9 +18,7 @@ import com.example.glovobot.Model.TaskRequest;
 import com.example.glovobot.Model.TaskType;
 import com.example.glovobot.Model.UpdateLocationActivity;
 import com.example.glovobot.Model.UpdateLocationRequest;
-import com.example.glovobot.Model.UpdateLocationResponse;
-import com.example.glovobot.MyApplication;
-import com.example.glovobot.activity_user;
+
 import com.example.glovobot.services.GlovoApiService;
 import com.example.glovobot.Model.OrderResponse;
 import com.example.glovobot.services.PythonApiService;
@@ -31,13 +27,11 @@ import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Observable;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import retrofit2.Call;
-import retrofit2.Callback;
 import retrofit2.Response;
 
 public class OrderPollingTask implements Runnable {
@@ -47,14 +41,14 @@ public class OrderPollingTask implements Runnable {
     private volatile boolean isRunning = true;
     private final Thread orderPollingThread;
     private List<GlovoTask> glovoTasks;
-    private String device_id;
-    private String mail;
-    private String password;
+    private final String device_id;
+    private final String mail;
+    private final String password;
     private long tokenExpireTs;
     private String token;
-    private List<Integer> acceptedOrderIds;
-    private List<Integer> processedTaskIds;
-    private List<Delivery> deliveries;
+    private final List<Integer> acceptedOrderIds;
+    private final List<Integer> processedTaskIds;
+    private final List<Delivery> deliveries;
 
     private boolean isCourierOnline;
     private Location currentLocation;
@@ -93,6 +87,7 @@ public class OrderPollingTask implements Runnable {
                 glovoTasks = remoteTasks;
             }
         } catch (IOException e) {
+            throw new RuntimeException(e);
         }
 
     }
@@ -114,7 +109,7 @@ public class OrderPollingTask implements Runnable {
         try {
             Response<AuthenticationResponse> authResponse = glovoApiService.authenticate(request).execute();
             if(authResponse.isSuccessful()){
-                String accessToken = authResponse.body().getAccessToken().toString();
+                String accessToken = Objects.requireNonNull(authResponse.body()).getAccessToken();
                 glovoApiService.setAuthToken(accessToken);
 
                 this.tokenExpireTs =getTs() + authResponse.body().getExpiresIn();
@@ -170,7 +165,7 @@ public class OrderPollingTask implements Runnable {
         try {
             pythonApiService.sendClear().execute();
         } catch (IOException e) {
-
+            throw new RuntimeException(e);
         }
 
 
@@ -186,7 +181,7 @@ public class OrderPollingTask implements Runnable {
                     continue;
                 android.util.Log.i("MyApplication", "OrderPollingTask : makeSureAuth {}" + orderPollingThread.getId());
 
-                if(makeSureGlovoAuth() == false)
+                if(!makeSureGlovoAuth())
                     continue;
 
                 android.util.Log.i("MyApplication", "OrderPollingTask : orderTasks for {}" + orderPollingThread.getId());
@@ -275,7 +270,7 @@ public class OrderPollingTask implements Runnable {
 
                         Response<StepResponse> responseStep = glovoApiService.getDeliverySteps(deliveryIdString).execute();
 
-                        if(responseStep.isSuccessful() == false)
+                        if(!responseStep.isSuccessful())
                             continue;
 
                         StepResponse stepData = responseStep.body();
@@ -299,6 +294,7 @@ public class OrderPollingTask implements Runnable {
 
             }
         } catch (IOException e) {
+            throw new RuntimeException(e);
         }
 
 //
@@ -358,7 +354,7 @@ public class OrderPollingTask implements Runnable {
         if(processedTaskIds.contains(task.getId()))
             return;
         Long deliveryId = params.get("id").getAsLong();
-        Long stepId = params.get("stepId").getAsLong();
+        long stepId = params.get("stepId").getAsLong();
 
 
         Optional<Delivery> delivery = deliveries.stream().filter(e->e.getOrderId() == deliveryId).findFirst();
@@ -367,7 +363,7 @@ public class OrderPollingTask implements Runnable {
             Response<StepResponse> stepResponse = glovoApiService.getDeliverySteps(String.valueOf(deliveryId)).execute();
 
             if(stepResponse.isSuccessful()){
-                Optional<Steps> step = stepResponse.body().getSteps().stream().filter(t->t.getId() == stepId).findFirst();
+                Optional<Steps> step = Objects.requireNonNull(stepResponse.body()).getSteps().stream().filter(t->t.getId() == stepId).findFirst();
                 if(step.isPresent()){
                     Response<Object> response =glovoApiService.deliveryOrder(deliveryId, step.get().getLocationId(), stepResponse.body().getVersion(), stepId).execute();
                     if(response.isSuccessful()){
@@ -385,7 +381,7 @@ public class OrderPollingTask implements Runnable {
 
 
         } catch (IOException e) {
-
+            throw new RuntimeException(e);
         }
     }
     private void taskDoRequestDeliveryList(GlovoTask task) {
@@ -424,10 +420,10 @@ public class OrderPollingTask implements Runnable {
             List<Steps> dropOffSteps = stepResponse.getSteps().stream().filter(t -> t.getName().equalsIgnoreCase("DROP_OFF") || t.getName().equalsIgnoreCase("GO_TO_SINGLE_PICKUP_POINT")).collect(Collectors.toList());
             for(Steps step : dropOffSteps){
                 Optional<Delivery> delivery = deliveries.stream().filter(t->t.getId() == step.getOrderId()).findFirst();
-                if(delivery.isPresent() == false)
+                if(!delivery.isPresent())
                     continue;
 
-                String buttonText = String.format("{} - {}",delivery.get().getDeliveryCode(), step.getTitle());
+                String buttonText = String.format("%s - %s",delivery.get().getDeliveryCode(), step.getTitle());
                 long stepId = step.getId();
                 long orderId = step.getOrderId();
 
@@ -450,7 +446,7 @@ public class OrderPollingTask implements Runnable {
         android.util.Log.i("MyApplication", "OrderPollingTask : CheckOrders:taskDoAcceptOrders {}" + orderPollingThread.getId());
         Integer orderId = params.get("order_id").getAsInt();
         Optional<Delivery> delivery = deliveries.stream().filter(d->d.getId() == orderId).findFirst();
-        if(delivery.isPresent() == false)
+        if(!delivery.isPresent())
             return;
 
         if(acceptedOrderIds.contains(orderId)){
@@ -475,7 +471,7 @@ public class OrderPollingTask implements Runnable {
         request.setParams(requestParams);
         try {
             Response<Object> response = glovoApiService.startOrder(delivery.get().getId(), delivery.get().getPoints().get(0).getLatitude(),  delivery.get().getPoints().get(0).getLongitude()).execute();
-            if(response.isSuccessful() == false){
+            if(!response.isSuccessful()){
                 pythonApiService.sendDirectMessage("Failed to accept order.");
             }else{
                 pythonApiService.sendMessage(request).execute();
@@ -503,7 +499,7 @@ public class OrderPollingTask implements Runnable {
 
     private void taskDoCancelOrders(GlovoTask task) {
         JsonObject params = task.getParams();
-        Integer orderId = params.get("order_id").getAsInt();
+        int orderId = params.get("order_id").getAsInt();
         if(processedTaskIds.contains(task.getId()))
             return;
 
@@ -533,7 +529,7 @@ public class OrderPollingTask implements Runnable {
 
             Response<StepResponse> stepResponse = glovoApiService.getDeliverySteps(orderId.toString()).execute();
             if(stepResponse.isSuccessful()){
-                List<Steps> steps = stepResponse.body().getSteps();
+                List<Steps> steps = Objects.requireNonNull(stepResponse.body()).getSteps();
                 if(steps.size() > 0){
                     Steps firstStep = steps.get(0);
                     com.example.glovobot.Model.Location stepLocation = firstStep.getLocation();
@@ -571,7 +567,7 @@ public class OrderPollingTask implements Runnable {
         if(processedTaskIds.contains(task.getId()))
             return;
         JsonObject params = task.getParams();
-        boolean isOnline = params.get("operation").getAsString().equals("ONLINE") ? true : false;
+        boolean isOnline = params.get("operation").getAsString().equals("ONLINE");
         try {
             this.glovoApiService.statusUpdate(isOnline).execute();
             processedTaskIds.add(task.getId());

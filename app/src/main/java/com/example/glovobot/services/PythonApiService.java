@@ -49,7 +49,7 @@ public class PythonApiService {
 
     public Call<Object> sendClear(){
         ClearRequest request = new ClearRequest();
-        return pythonRestInterface.sendClear(getHeaders(), request);
+        return pythonRestInterface.sendClear(getHeaders());
     }
 
     public void sendDirectMessage(String message){

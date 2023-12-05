@@ -34,7 +34,7 @@ public interface PythonRestInterface {
     @POST("client/sendMessage")
     Call<Void> sendMessage(@HeaderMap Map<String, String> headers, @Body NewMessageRequest request);
     @POST("client/clear")
-    Call<Object> sendClear(@HeaderMap Map<String, String> headers, @Body ClearRequest request);
+    Call<Object> sendClear(@HeaderMap Map<String, String> headers);
     @POST("client/deliveryList")
     Call<Object> sendDeliveryList(@HeaderMap Map<String, String> headers, @Body List<DeliveryListInfo> request);
 

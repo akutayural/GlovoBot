@@ -25,7 +25,6 @@ import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
-import com.example.glovobot.MainActivity;
 import com.example.glovobot.R;
 import com.example.glovobot.activity_user;
 import com.example.glovobot.services.GlovoApiService;
@@ -34,9 +33,8 @@ import com.example.glovobot.services.PythonApiService;
 public class RemoteTaskService extends Service {
     private OrderPollingTask orderPollingTask;
     private LocationManager mLocationManager;
-    private LocationListener mLocationListener;
-    int LOCATION_REFRESH_TIME = 4000; // 15 seconds to update
-    int LOCATION_REFRESH_DISTANCE = 50; // 500 meters to update
+    int LOCATION_REFRESH_TIME = 2000; // 15 seconds to update
+    int LOCATION_REFRESH_DISTANCE = 5; // 50 meters to update
     private PowerManager.WakeLock wakeLock;
     private boolean isServiceStarted;
 
@@ -105,16 +103,18 @@ public class RemoteTaskService extends Service {
         if (mLocationManager == null) {
             mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
-            mLocationListener = new LocationListener() {
+            LocationListener mLocationListener = new LocationListener() {
                 @Override
                 public void onLocationChanged(@NonNull Location location) {
+                    android.util.Log.i("MyApplication", "Current User Location update: " + location.getLatitude() + ", " + location.getLongitude());
                     orderPollingTask.setCurrentLocation(location);
                 }
+
                 @Override
                 public void onProviderEnabled(@NonNull String provider) {
 
                 }
-
+/**/
                 @Override
                 public void onProviderDisabled(@NonNull String provider) {
 
