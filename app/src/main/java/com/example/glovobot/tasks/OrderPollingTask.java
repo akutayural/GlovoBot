@@ -49,7 +49,6 @@ public class OrderPollingTask implements Runnable {
     private final List<Integer> acceptedOrderIds;
     private final List<Integer> processedTaskIds;
     private final List<Delivery> deliveries;
-
     private boolean isCourierOnline;
     private Location currentLocation;
 
@@ -367,8 +366,9 @@ public class OrderPollingTask implements Runnable {
                 if(step.isPresent()){
                     Response<Object> response =glovoApiService.deliveryOrder(deliveryId, step.get().getLocationId(), stepResponse.body().getVersion(), stepId).execute();
                     if(response.isSuccessful()){
-                        if(delivery.isPresent())
+                        if(delivery.isPresent()){
                             pythonApiService.sendDirectMessage("Entregastes la orden con exito.#" + delivery.get().getDeliveryCode());
+                        }
                         else
                             pythonApiService.sendDirectMessage("Successfully delivered.");
                     }
@@ -389,13 +389,12 @@ public class OrderPollingTask implements Runnable {
         if(processedTaskIds.contains(task.getId()))
             return;
 
-        List<GlovoTask> acceptedOrders = glovoTasks.stream().filter(t->t.getType() == TaskType.ACCEPT_ORDER).collect(Collectors.toList());
-        if(acceptedOrders.isEmpty()){
+        List<Integer> acceptedOrderIds = this.acceptedOrderIds.stream().collect(Collectors.toList());
+        if(acceptedOrderIds.isEmpty()){
             pythonApiService.sendDirectMessage("Could not find any accepted orders.");
             return;
         }
 
-        List<Integer> acceptedOrderIds = acceptedOrders.stream().map(t->t.getParams().get("order_id").getAsInt()).collect(Collectors.toList());
         List<StepResponse> stepResponses = new ArrayList<>();
 
         for(Integer order_id : acceptedOrderIds){
@@ -432,6 +431,8 @@ public class OrderPollingTask implements Runnable {
                 listInfo.setOrderId(orderId);
                 listInfo.setStepId(stepId);
                 deliveryList.add(listInfo);
+
+
 
 
 
@@ -548,7 +549,7 @@ public class OrderPollingTask implements Runnable {
                     }
 
                     pythonApiService.sendDirectMessage("Estás en el sitio de ent88rega, por favor espera a que el pedido esté listo.");
-
+                    this.acceptedOrderIds.removeIf(e->e == Integer.valueOf( orderId.toString() ));
                 }else
                     pythonApiService.sendDirectMessage("Failed to pickUp order.");
 
